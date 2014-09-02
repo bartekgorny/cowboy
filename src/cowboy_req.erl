@@ -489,12 +489,8 @@ cookie(Name, Req) when is_binary(Name) ->
 -spec cookie(binary(), Req, Default)
 	-> {binary() | Default, Req} when Req::req(), Default::any().
 cookie(Name, Req=#http_req{cookies=undefined}, Default) when is_binary(Name) ->
-	case parse_header(<<"cookie">>, Req) of
-		{ok, undefined, Req2} ->
-			{Default, Req2#http_req{cookies=[]}};
-		{ok, Cookies, Req2} ->
-			cookie(Name, Req2#http_req{cookies=Cookies}, Default)
-	end;
+	{_, Req1} = cookies(Req),
+    cookie(Name, Req1, Default);
 cookie(Name, Req, Default) ->
 	case lists:keyfind(Name, 1, Req#http_req.cookies) of
 		{Name, Value} -> {Value, Req};
