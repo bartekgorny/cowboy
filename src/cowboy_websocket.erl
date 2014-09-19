@@ -56,9 +56,17 @@
 }).
 
 
--spec nif_init() -> ok | no_return().
+-spec nif_init() -> ok | {error, Reason :: any()}.
 nif_init() ->
-	ok = erlang:load_nif("priv/websocket_utils", 0).
+	PrivDir = case code:priv_dir(cowboy) of
+		{error, _} ->
+			EbinDir = filename:dirname(code:which(?MODULE)),
+			AppPath = filename:dirname(EbinDir),
+			filename:join(AppPath, "priv");
+		Path ->
+			Path
+	end,
+	erlang:load_nif(filename:join(PrivDir, "websocket_utils"), 0).
 
 -spec upgrade(Req, Env, module(), any())
 	-> {ok, Req, Env}
