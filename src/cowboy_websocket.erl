@@ -20,6 +20,8 @@
 -export([upgrade/4]).
 -export([handler_loop/4]).
 
+-on_load(nif_init/0).
+
 -type close_code() :: 1000..4999.
 -export_type([close_code/0]).
 
@@ -52,6 +54,11 @@
 	inflate_state :: undefined | port(),
 	deflate_state :: undefined | port()
 }).
+
+
+-spec nif_init() -> ok | no_return().
+nif_init() ->
+	ok = erlang:load_nif("priv/websocket_utils", 0).
 
 -spec upgrade(Req, Env, module(), any())
 	-> {ok, Req, Env}
@@ -337,7 +344,7 @@ websocket_data(State, Req, HandlerState, Opcode, Len, MaskKey, Data, Rsv, 1) ->
 websocket_payload(State, Req, HandlerState,
 		Opcode=8, Len, MaskKey, <<>>, 0,
 		<< MaskedCode:2/binary, Rest/bits >>, Rsv) ->
-	Unmasked = << Code:16 >> = websocket_unmask(MaskedCode, MaskKey, <<>>),
+	Unmasked = << Code:16 >> = websocket_unmask(MaskedCode, MaskKey),
 	if	Code < 1000; Code =:= 1004; Code =:= 1005; Code =:= 1006;
 				(Code > 1011) and (Code < 3000); Code > 4999 ->
 			websocket_close(State, Req, HandlerState, {error, badframe});
@@ -353,7 +360,7 @@ websocket_payload(State=#state{utf8_state=Incomplete},
 		when (byte_size(Data) < Len) andalso ((Opcode =:= 1) orelse
 			((Opcode =:= 8) andalso (Unmasked =/= <<>>))) ->
 	Unmasked2 = websocket_unmask(Data,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, false, State),
 	case is_utf8(<< Incomplete/binary, Unmasked3/binary >>) of
 		false ->
@@ -370,7 +377,7 @@ websocket_payload(State=#state{utf8_state=Incomplete},
 		when Opcode =:= 1; (Opcode =:= 8) and (Unmasked =/= <<>>) ->
 	<< End:Len/binary, Rest/bits >> = Data,
 	Unmasked2 = websocket_unmask(End,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, true, State),
 	case is_utf8(<< Incomplete/binary, Unmasked3/binary >>) of
 		<<>> ->
@@ -386,7 +393,7 @@ websocket_payload(State=#state{frag_state={_, 1, _}, utf8_state=Incomplete},
 		Data, Rsv)
 		when byte_size(Data) < Len ->
 	Unmasked2 = websocket_unmask(Data,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, false, State),
 	case is_utf8(<< Incomplete/binary, Unmasked3/binary >>) of
 		false ->
@@ -402,7 +409,7 @@ websocket_payload(State=#state{frag_state={Fin, 1, _}, utf8_state=Incomplete},
 		Data, Rsv) ->
 	<< End:Len/binary, Rest/bits >> = Data,
 	Unmasked2 = websocket_unmask(End,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, Fin =:= fin, State),
 	case is_utf8(<< Incomplete/binary, Unmasked3/binary >>) of
 		<<>> ->
@@ -421,7 +428,7 @@ websocket_payload(State, Req, HandlerState,
 		Opcode, Len, MaskKey, Unmasked, UnmaskedLen, Data, Rsv)
 		when byte_size(Data) < Len ->
 	Unmasked2 = websocket_unmask(Data,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, false, State),
 	websocket_payload_loop(State2, Req, HandlerState,
 		Opcode, Len - byte_size(Data), MaskKey,
@@ -431,7 +438,7 @@ websocket_payload(State, Req, HandlerState,
 		Opcode, Len, MaskKey, Unmasked, UnmaskedLen, Data, Rsv) ->
 	<< End:Len/binary, Rest/bits >> = Data,
 	Unmasked2 = websocket_unmask(End,
-		rotate_mask_key(MaskKey, UnmaskedLen), <<>>),
+		rotate_mask_key(MaskKey, UnmaskedLen)),
 	{Unmasked3, State2} = websocket_inflate_frame(Unmasked2, Rsv, true, State),
 	websocket_dispatch(State2, Req, HandlerState, Rest, Opcode,
 		<< Unmasked/binary, Unmasked3/binary >>).
@@ -449,6 +456,10 @@ websocket_inflate_frame(Data, << 1:1, _:2 >>, true, State) ->
 	Result = zlib:inflate(State#state.inflate_state,
 		<< Data/binary, 0:8, 0:8, 255:8, 255:8 >>),
 	{iolist_to_binary(Result), State}.
+
+-spec websocket_unmask(B, mask_key()) -> B when B::binary().
+websocket_unmask(_Payload, _MaskKey) ->
+	erlang:error('NIF_not_loaded').
 
 -spec websocket_unmask(B, mask_key(), B) -> B when B::binary().
 websocket_unmask(<<>>, _, Unmasked) ->
@@ -476,7 +487,7 @@ rotate_mask_key(MaskKey, UnmaskedLen) ->
 	Right = 4 - Left,
 	(MaskKey bsl (Left * 8)) + (MaskKey bsr (Right * 8)).
 
-%% Returns <<>> if the argument is valid UTF-8, false if not,
+%% Returns <<>> if the argument is valid UT§F-8, false if not,
 %% or the incomplete part of the argument if we need more data.
 -spec is_utf8(binary()) -> false | binary().
 is_utf8(Valid = <<>>) ->
