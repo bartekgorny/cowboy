@@ -675,11 +675,12 @@ headers_decode(HeaderBlock, DecodeState0) ->
 headers_to_map([], Acc) ->
 	Acc;
 headers_to_map([{Name, Value}|Tail], Acc0) ->
-	Acc = case Acc0 of
+	Value0 = maps:get(Name, Acc0, undefined),
+	Acc = case {Name, Value0} of
+		{_, undefined} -> maps:put(Name, Value, Acc0);
 		%% The cookie header does not use proper HTTP header lists.
-		#{Name := Value0} when Name =:= <<"cookie">> -> Acc0#{Name => << Value0/binary, "; ", Value/binary >>};
-		#{Name := Value0} -> Acc0#{Name => << Value0/binary, ", ", Value/binary >>};
-		_ -> Acc0#{Name => Value}
+		{Name, _} when Name =:= <<"cookie">> -> maps:put(Name, << Value0/binary, "; ", Value/binary >>, Acc0);
+		{Name, _} -> maps:put(Name, << Value0/binary, ", ", Value/binary >>, Acc0)
 	end,
 	headers_to_map(Tail, Acc).
 

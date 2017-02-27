@@ -561,16 +561,16 @@ set_resp_cookie(Name, Value, Req) ->
 set_resp_cookie(Name, Value, Opts, Req) ->
 	Cookie = cow_cookie:setcookie(Name, Value, maps:to_list(Opts)),
 	RespCookies = maps:get(resp_cookies, Req, #{}),
-	Req#{resp_cookies => RespCookies#{Name => Cookie}}.
+	Req#{resp_cookies => maps:put(Name, Cookie, RespCookies)}.
 
 %% @todo We could add has_resp_cookie and delete_resp_cookie now.
 
 -spec set_resp_header(binary(), iodata(), Req)
 	-> Req when Req::req().
 set_resp_header(Name, Value, Req=#{resp_headers := RespHeaders}) ->
-	Req#{resp_headers => RespHeaders#{Name => Value}};
+	Req#{resp_headers => maps:put(Name, Value, RespHeaders)};
 set_resp_header(Name,Value, Req) ->
-	Req#{resp_headers => #{Name => Value}}.
+	Req#{resp_headers => maps:put(Name, Value, #{})}.
 
 -spec set_resp_headers(cowboy:http_headers(), Req)
 	-> Req when Req::req().
@@ -746,13 +746,13 @@ kvlist_to_map(Keys, [{Key, Value}|Tail], Map) ->
 					case maps:find(Atom, Map) of
 						{ok, MapValue} when is_list(MapValue) ->
 							kvlist_to_map(Keys, Tail,
-								Map#{Atom => [Value|MapValue]});
+								maps:put(Atom, [Value|MapValue], Map));
 						{ok, MapValue} ->
 							kvlist_to_map(Keys, Tail,
-								Map#{Atom => [Value, MapValue]});
+								maps:put(Atom, [Value, MapValue], Map));
 						error ->
 							kvlist_to_map(Keys, Tail,
-								Map#{Atom => Value})
+								maps:put(Atom, Value, Map))
 					end;
 				false ->
 					kvlist_to_map(Keys, Tail, Map)
@@ -773,7 +773,7 @@ filter([{Key, Constraints, Default}|Tail], Map) ->
 		{ok, Value} ->
 			filter_constraints(Tail, Map, Key, Value, Constraints);
 		error ->
-			filter(Tail, Map#{Key => Default})
+			filter(Tail, maps:put(Key, Default, Map))
 	end;
 filter([Key|Tail], Map) ->
 	true = maps:is_key(Key, Map),
@@ -784,5 +784,5 @@ filter_constraints(Tail, Map, Key, Value, Constraints) ->
 		true ->
 			filter(Tail, Map);
 		{true, Value2} ->
-			filter(Tail, Map#{Key => Value2})
+			filter(Tail, maps:put(Key, Value2, Map))
 	end.

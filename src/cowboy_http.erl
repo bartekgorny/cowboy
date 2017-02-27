@@ -494,10 +494,10 @@ parse_hd_before_value(Buffer, State=#state{opts=Opts, in_state=PS}, H, N) ->
 parse_hd_value(<< $\r, $\n, Rest/bits >>, S, Headers0, Name, SoFar) ->
 	Value = clean_value_ws_end(SoFar, byte_size(SoFar) - 1),
 	Headers = case maps:get(Name, Headers0, undefined) of
-		undefined -> Headers0#{Name => Value};
+		undefined -> maps:put(Name, Value, Headers0);
 		%% The cookie header does not use proper HTTP header lists.
-		Value0 when Name =:= <<"cookie">> -> Headers0#{Name => << Value0/binary, "; ", Value/binary >>};
-		Value0 -> Headers0#{Name => << Value0/binary, ", ", Value/binary >>}
+		Value0 when Name =:= <<"cookie">> -> maps:put(Name, << Value0/binary, "; ", Value/binary >>, Headers0);
+		Value0 -> maps:put(Name, << Value0/binary, ", ", Value/binary >>, Headers0)
 	end,
 	parse_header(Rest, S, Headers);
 parse_hd_value(<< C, Rest/bits >>, S, H, N, SoFar) ->
