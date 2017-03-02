@@ -780,7 +780,7 @@ if_modified_since_exists(Req, State) ->
 	end.
 
 if_modified_since_now(Req, State, IfModifiedSince) ->
-	case IfModifiedSince > erlang:universaltime() of
+	case IfModifiedSince > calendar:universal_time() of
 		true -> method(Req, State);
 		false -> if_modified_since(Req, State, IfModifiedSince)
 	end.

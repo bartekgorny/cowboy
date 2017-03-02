@@ -203,13 +203,13 @@ loop(State=#state{parent=Parent, socket=Socket, transport=Transport,
 set_request_timeout(State0=#state{opts=Opts}) ->
 	State = cancel_request_timeout(State0),
 	Timeout = maps:get(request_timeout, Opts, 5000),
-	TimerRef = erlang:start_timer(Timeout, self(), request_timeout),
+	{ok, TimerRef} = timer:send_after(Timeout, self(), request_timeout),
 	State#state{timer=TimerRef}.
 
 cancel_request_timeout(State=#state{timer=TimerRef}) ->
-	ok = case TimerRef of
-		undefined -> ok;
-		_ -> erlang:cancel_timer(TimerRef, [{async, true}, {info, false}])
+	{ok, _} = case TimerRef of
+		undefined -> {ok, undefined};
+		_ -> timer:cancel(TimerRef)
 	end,
 	State#state{timer=undefined}.
 

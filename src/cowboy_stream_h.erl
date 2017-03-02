@@ -62,7 +62,7 @@ data(_StreamID, nofin, Data, State=#state{read_body_length=Length, read_body_buf
 	{[], State#state{read_body_buffer= << Buffer/binary, Data/binary >>}};
 data(_StreamID, IsFin, Data, State=#state{pid=Pid, read_body_ref=Ref,
 		read_body_timer_ref=TRef, read_body_buffer=Buffer}) ->
-	ok = erlang:cancel_timer(TRef, [{async, true}, {info, false}]),
+	_ = timer:cancel(TRef),
 	Pid ! {request_body, Ref, IsFin, << Buffer/binary, Data/binary >>},
 	{[], State#state{read_body_ref=undefined, read_body_timer_ref=undefined, read_body_buffer= <<>>}}.
 

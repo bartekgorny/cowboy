@@ -211,8 +211,8 @@ handler_loop_timeout(State=#state{timeout=infinity}) ->
 	State#state{timeout_ref=undefined};
 handler_loop_timeout(State=#state{timeout=Timeout, timeout_ref=PrevRef}) ->
 	_ = case PrevRef of undefined -> ignore; PrevRef ->
-		erlang:cancel_timer(PrevRef) end,
-	TRef = erlang:start_timer(Timeout, self(), ?MODULE),
+		timer:cancel(PrevRef) end,
+	{ok, TRef} = timer:send_after(Timeout, self(), ?MODULE),
 	State#state{timeout_ref=TRef}.
 
 -spec handler_loop(#state{}, any(), binary())

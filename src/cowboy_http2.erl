@@ -131,7 +131,8 @@ preface(#state{socket=Socket, transport=Transport, next_settings=Settings}) ->
 
 preface_timeout(Opts) ->
 	PrefaceTimeout = maps:get(preface_timeout, Opts, 5000),
-	erlang:start_timer(PrefaceTimeout, self(), preface_timeout).
+	{ok, TRef} = timer:send_after(PrefaceTimeout, self(), preface_timeout),
+	TRef.
 
 %% @todo Add the timeout for last time since we heard of connection.
 before_loop(State, Buffer) ->
@@ -232,7 +233,7 @@ parse(State=#state{parse_state=ParseState}, Data) ->
 	end.
 
 parse_settings_preface(State, Frame={settings, _}, Rest, TRef) ->
-	_ = erlang:cancel_timer(TRef, [{async, true}, {info, false}]),
+	_ = timer:cancel(TRef),
 	parse(frame(State#state{parse_state=normal}, Frame), Rest);
 parse_settings_preface(State, _, _, _) ->
 	terminate(State, {connection_error, protocol_error,

@@ -63,7 +63,7 @@ rfc1123(DateTime) ->
 init([]) ->
 	?MODULE = ets:new(?MODULE, [set, protected,
 		named_table, {read_concurrency, true}]),
-	T = erlang:universaltime(),
+	T = calendar:universal_time(),
 	B = update_rfc1123(<<>>, undefined, T),
 	TRef = erlang:send_after(1000, self(), update),
 	ets:insert(?MODULE, {rfc1123, B}),
@@ -85,8 +85,8 @@ handle_cast(_Msg, State) ->
 -spec handle_info(any(), State) -> {noreply, State} when State::#state{}.
 handle_info(update, #state{universaltime=Prev, rfc1123=B1, tref=TRef0}) ->
 	%% Cancel the timer in case an external process sent an update message.
-	_ = erlang:cancel_timer(TRef0),
-	T = erlang:universaltime(),
+	_ = timer:cancel(TRef0),
+	T = calendar:universal_time(),
 	B2 = update_rfc1123(B1, Prev, T),
 	ets:insert(?MODULE, {rfc1123, B2}),
 	TRef = erlang:send_after(1000, self(), update),
